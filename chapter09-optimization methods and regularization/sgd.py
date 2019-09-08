@@ -24,12 +24,21 @@ def predict(X, W):
     return preds
 
 
+def next_batch(X, y, batchSize):
+    # loop over our dataset 'X' in mini-batches, yielding a tuple of
+    # the current batched data and labels
+    for i in np.arange(0, X.shape[0], batchSize):
+        yield (X[i:i + batchSize], y[i:i + batchSize])
+
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-e", "--epochs", type=float, default=100,
                 help="# of epochs")
 ap.add_argument("-a", "--alpha", type=float, default=0.01,
                 help="learning rate")
+ap.add_argument("-b", "--batch-size", type=int, default=32,
+                help="size of SGD mini-batch")
 args = vars(ap.parse_args())
 
 # generate a 2-class classification problem with 1,000 data points,
@@ -57,25 +66,31 @@ losses = []
 # and gradient descent procedure
 # loop over the desired number of epochs (1 epoch mean the 1 loop that our procedure visit all data points)
 for epoch in np.arange(0, args["epochs"]):
-    # take the dot product between our feature 'X' and the weight matrix 'W'
-    # then pass this value through our sigmoid activation function
-    # thereby giving us our predictions on the dataset
-    preds = sigmoid_activation(trainX.dot(W))
+    # initialize the total loss for the epoch
+    epochLoss = []
 
-    # now that we have our predictions, we need to determine the 'error'
-    # which is the difference between our predictions and the true values
-    error = preds - trainY
-    loss = np.sum(error ** 2)
+    # loop over our data in batches
+    for (batchX, batchY) in next_batch(X, y, args["batch_size"]):
+        # take the dot product between our current batch of features
+        # and the weight matrix, then pass this value through our activation function
+        preds = sigmoid_activation(batchX.dot(W))
+
+        # now that we have our predictions, we need to determine the 'error'
+        # which is the difference between our predictions and the true values
+        error = preds - batchY
+        epochLoss.append(np.sum(error ** 2))
+        # the gradient descent update is the dot product between our
+        # current batch and the error on the batch
+        gradient = batchX.T.dot(error)
+
+        # in the update stage, all we need to do is "nudge" the weight
+        # matrix in the negative direction of the gradient (hence the term "gradient descent")
+        # by taking a small step towards a set of "more optimal" parameters
+        W += -args["alpha"] * gradient
+
+    # update our loss history by taking the average loss across all batches
+    loss = np.average(epochLoss)
     losses.append(loss)
-
-    # the gradient descent update is the dot product between our
-    # features and the error of the predictions
-    gradient = trainX.T.dot(error)
-
-    # in the update stage, all we need to do is "nudge" the weight
-    # matrix in the negative direction of the gradient (hence the term "gradient descent")
-    # by taking a small step towards a set of "more optimal" parameters
-    W += -args["alpha"] * gradient
 
     # check to see if an update should be displayed
     if epoch == 0 or (epoch + 1) % 5 == 0:
